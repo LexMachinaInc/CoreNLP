@@ -31,7 +31,7 @@ public class IOUtils {
   private IOUtils() { }
 
   /**
-   * Write object to a file with the specified name.
+   * Write object to a file with the specified name.  The file is silently gzipped if the filename ends with .gz.
    *
    * @param o Object to be written to file
    * @param filename Name of the temp file
@@ -44,7 +44,7 @@ public class IOUtils {
   }
 
   /**
-   * Write an object to a specified File.
+   * Write an object to a specified File.  The file is silently gzipped if the filename ends with .gz.
    *
    * @param o Object to be written to file
    * @param file The temp File
@@ -56,7 +56,7 @@ public class IOUtils {
   }
 
   /**
-   * Write an object to a specified File. The file is silently gzipped regardless of name.
+   * Write an object to a specified File. The file is silently gzipped if the filename ends with .gz.
    *
    * @param o Object to be written to file
    * @param file The temp File
@@ -66,8 +66,12 @@ public class IOUtils {
    */
   public static File writeObjectToFile(Object o, File file, boolean append) throws IOException {
     // file.createNewFile(); // cdm may 2005: does nothing needed
-    ObjectOutputStream oos = new ObjectOutputStream(new BufferedOutputStream(
-            new GZIPOutputStream(new FileOutputStream(file, append))));
+    OutputStream os = new FileOutputStream(file, append);
+    if (file.getName().endsWith(".gz")) {
+      os = new GZIPOutputStream(os);
+    }
+    os = new BufferedOutputStream(os);
+    ObjectOutputStream oos = new ObjectOutputStream(os);
     oos.writeObject(o);
     oos.close();
     return file;
@@ -139,8 +143,7 @@ public class IOUtils {
     return os;
   }
 
-  //++ todo [cdm, Aug 2012]: None of the methods below in this block are used. Delete them all?
-  //++ They're also kind of weird in unnecessarily bypassing using a Writer.
+  //++ todo [cdm, Aug 2012]: Do we need the below methods? They're kind of weird in unnecessarily bypassing using a Writer.
 
   /**
    * Writes a string to a file.
@@ -256,9 +259,10 @@ public class IOUtils {
     writeStringToTempFileNoExceptions(contents, path, "UTF-8");
   }
 
-  //-- todo [cdm, Aug 2012]: None of the methods above in the block are used. Delete them all?
+  //-- todo [cdm, Aug 2012]: Do we need the below methods? They're kind of weird in unnecessarily bypassing using a Writer.
 
 
+  // todo [cdm, Sep 2013]: Can we remove this next method and its friends? (Weird in silently gzipping, overlaps other functionality.)
   /**
    * Read an object from a stored file. It is silently ungzipped, regardless of name.
    *
@@ -268,12 +272,20 @@ public class IOUtils {
    * @return The object read from the file.
    */
   public static <T> T readObjectFromFile(File file) throws IOException,
-          ClassNotFoundException {
-    ObjectInputStream ois = new ObjectInputStream(new BufferedInputStream(
-            new GZIPInputStream(new FileInputStream(file))));
-    Object o = ois.readObject();
-    ois.close();
-    return ErasureUtils.uncheckedCast(o);
+      ClassNotFoundException {
+    try {
+      ObjectInputStream ois = new ObjectInputStream(new BufferedInputStream(
+          new GZIPInputStream(new FileInputStream(file))));
+      Object o = ois.readObject();
+      ois.close();
+      return ErasureUtils.uncheckedCast(o);
+    } catch (java.util.zip.ZipException e) {
+      ObjectInputStream ois = new ObjectInputStream(new BufferedInputStream(
+          new FileInputStream(file)));
+      Object o = ois.readObject();
+      ois.close();
+      return ErasureUtils.uncheckedCast(o);
+    }
   }
 
   public static DataInputStream getDataInputStream(String filenameUrlOrClassPath) throws IOException {
@@ -390,6 +402,20 @@ public class IOUtils {
   }
 
   /**
+   * Check if this path exists either in the classpath or on the filesystem.
+   *
+   * @param name The file or resource name.
+   * @return true if a call to {@link IOUtils#getBufferedReaderFromClasspathOrFileSystem(String)} would return a valid stream.
+   */
+  public static boolean existsInClasspathOrFileSystem(String name) {
+    InputStream is = IOUtils.class.getClassLoader().getResourceAsStream(name);
+    if (is == null) {
+      is = IOUtils.class.getClassLoader().getResourceAsStream(name.replaceAll("\\\\", "/"));
+    }
+    return is != null || new File(name).exists();
+  }
+
+  /**
    * Locates this file either using the given URL, or in the CLASSPATH, or in the file system
    * The CLASSPATH takes priority over the file system!
    * This stream is buffered and gunzipped (if necessary).
@@ -424,22 +450,82 @@ public class IOUtils {
       }
     }
 
+    if (textFileOrUrl.endsWith(".gz")) {
+      // gunzip it if necessary
+      in = new GZIPInputStream(in, 65536);
+    }
+
     // buffer this stream
     in = new BufferedInputStream(in);
-
-    // gzip it if necessary
-    if (textFileOrUrl.endsWith(".gz"))
-      in = new GZIPInputStream(in);
 
     return in;
   }
 
   /**
+   * Quietly opens a File. If the file ends with a ".gz" extension,
+   * automatically opens a GZIPInputStream to wrap the constructed
+   * FileInputStream.
+   */
+  public static InputStream inputStreamFromFile(File file) throws RuntimeIOException {
+    try {
+      InputStream is = new BufferedInputStream(new FileInputStream(file));
+      if (file.getName().endsWith(".gz")) {
+        is = new GZIPInputStream(is);
+      }
+      return is;
+    } catch (IOException e) {
+      throw new RuntimeIOException(e);
+    }
+  }
+
+  /**
+   * Open a BufferedReader to a File. If the file's getName() ends in .gz,
+   * it is interpreted as a gzipped file (and uncompressed). The file is then
+   * interpreted as a utf-8 text file.
+   *
+   * @param file What to read from
+   * @return The BufferedReader
+   * @throws RuntimeIOException If there is an I/O problem
+   */
+  public static BufferedReader readerFromFile(File file) {
+    InputStream is = null;
+    try {
+      is = inputStreamFromFile(file);
+      return new BufferedReader(new InputStreamReader(is, "UTF-8"));
+    } catch (IOException ioe) {
+      throw new RuntimeIOException(ioe);
+    } finally {
+      IOUtils.closeIgnoringExceptions(is);
+    }
+  }
+
+
+
+  /**
    * Open a BufferedReader on stdin. Use the user's default encoding.
+   *
+   * @return The BufferedReader
+   * @throws IOException If there is an I/O problem
    */
   public static BufferedReader readerFromStdin() throws IOException {
     return new BufferedReader(new InputStreamReader(System.in));
   }
+
+  /**
+   * Open a BufferedReader on stdin. Use the specified character encoding.
+   *
+   * @param encoding CharSet encoding. Maybe be null, in which case the
+   *         platform default encoding is used
+   * @return The BufferedReader
+   * @throws IOException If there is an I/O problem
+   */
+  public static BufferedReader readerFromStdin(String encoding) throws IOException {
+    if (encoding == null) {
+      return new BufferedReader(new InputStreamReader(System.in));
+    }
+    return new BufferedReader(new InputStreamReader(System.in, encoding));
+  }
+
 
   /**
    * Open a BufferedReader to a file or URL specified by a String name. If the
@@ -650,12 +736,13 @@ public class IOUtils {
   }
 
   /**
-   * Given a reader, returns the lines from the reader as a iterable
+   * Given a reader, returns the lines from the reader as an Iterable.
+   *
    * @param r  input reader
    * @param includeEol whether to keep eol-characters in the returned strings
    * @return iterable of lines (as strings)
    */
-  public static final Iterable<String> getLineIterable( Reader r, boolean includeEol) {
+  public static Iterable<String> getLineIterable( Reader r, boolean includeEol) {
     if (includeEol) {
       return new EolPreservingLineReaderIterable(r);
     } else {
@@ -663,7 +750,7 @@ public class IOUtils {
     }
   }
 
-  public static final Iterable<String> getLineIterable( Reader r, int bufferSize, boolean includeEol) {
+  public static Iterable<String> getLineIterable( Reader r, int bufferSize, boolean includeEol) {
     if (includeEol) {
       return new EolPreservingLineReaderIterable(r, bufferSize);
     } else {
@@ -850,23 +937,6 @@ public class IOUtils {
   }
 
   /**
-   * Quietly opens a File. If the file ends with a ".gz" extension,
-   * automatically opens a GZIPInputStream to wrap the constructed
-   * FileInputStream.
-   */
-  public static InputStream openFile(File file) throws RuntimeIOException {
-    try {
-      InputStream is = new BufferedInputStream(new FileInputStream(file));
-      if (file.getName().endsWith(".gz")) {
-        is = new GZIPInputStream(is);
-      }
-      return is;
-    } catch (IOException e) {
-      throw new RuntimeIOException(e);
-    }
-  }
-
-  /**
    * Provides an implementation of closing a file for use in a finally block so
    * you can correctly close a file without even more exception handling stuff.
    * From a suggestion in a talk by Josh Bloch.
@@ -999,10 +1069,6 @@ public class IOUtils {
     return IOUtils.slurpReader(r);
   }
 
-  public static String slurpGBFileNoExceptions(String filename) {
-    return IOUtils.slurpFileNoExceptions(filename, "GB18030");
-  }
-
   /**
    * Returns all the text in the given file with the given encoding.
    */
@@ -1027,10 +1093,6 @@ public class IOUtils {
     }
   }
 
-  public static String slurpGBFile(String filename) throws IOException {
-    return slurpFile(filename, "GB18030");
-  }
-
   /**
    * Returns all the text in the given file
    *
@@ -1045,18 +1107,6 @@ public class IOUtils {
    */
   public static String slurpGBURL(URL u) throws IOException {
     return IOUtils.slurpURL(u, "GB18030");
-  }
-
-  /**
-   * Returns all the text at the given URL.
-   */
-  public static String slurpGBURLNoExceptions(URL u) {
-    try {
-      return slurpGBURL(u);
-    } catch (Exception e) {
-      e.printStackTrace();
-      return null;
-    }
   }
 
   /**
@@ -1566,11 +1616,19 @@ public class IOUtils {
    * and null is returned. Encoding can also be specified
    */
   public static List<String> linesFromFile(String filename,String encoding) {
+    return linesFromFile(filename, encoding, false);
+  }
+
+  public static List<String> linesFromFile(String filename,String encoding, boolean ignoreHeader) {
     try {
       List<String> lines = new ArrayList<String>();
       BufferedReader in = new BufferedReader(new EncodingFileReader(filename,encoding));
       String line;
+      int i = 0;
       while ((line = in.readLine()) != null) {
+        i++;
+        if(ignoreHeader && i == 1)
+          continue;
         lines.add(line);
       }
       in.close();
@@ -1639,6 +1697,21 @@ public class IOUtils {
     }
   }
 
+  /**
+   * Given a filepath, delete all files in the directory recursively
+   * @param dir
+   * @return
+   */
+  public static boolean deleteDirRecursively(File dir) {
+    if (dir.isDirectory()) {
+      for (File f : dir.listFiles()) {
+        boolean success = deleteDirRecursively(f);
+        if (!success)
+          return false;
+      }
+    }
+    return dir.delete();
+  }
 
   public static String getExtension(String fileName) {
     if(!fileName.contains("."))

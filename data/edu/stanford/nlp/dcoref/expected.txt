@@ -1,15 +1,15 @@
 CONLL EVAL SUMMARY (Before COREF)
-Identification of Mentions: Recall: (12408 / 14291) 86.82%  Precision: (12408 / 35222) 35.22% F1: 50.12%
+Identification of Mentions: Recall: (12405 / 14291) 86.8%	Precision: (12405 / 34910) 35.53%	F1: 50.42%
 
 CONLL EVAL SUMMARY (After COREF)
-METRIC muc:Coreference: Recall: (6285 / 10539) 59.63% Precision: (6285 / 10091) 62.28%  F1: 60.93%
-METRIC bcub:Coreference: Recall: (12484.8470738808 / 18359) 68% Precision: (13595.5430085166 / 18359) 74.05%  F1: 70.9%
-METRIC ceafm:Coreference: Recall: (10923 / 18359) 59.49%  Precision: (10923 / 18359) 59.49% F1: 59.49%
-METRIC ceafe:Coreference: Recall: (3803.86749179821 / 7820) 48.64%  Precision: (3803.86749179821 / 8268) 46%  F1: 47.28
-METRIC blanc:Coreference links: Recall: (25609 / 54427) 47.05%  Precision: (25609 / 41791) 61.27% F1: 53.23%
-Non-coreference links: Recall: (929360 / 945542) 98.28% Precision: (929360 / 958178) 96.99% F1: 97.63%
-BLANC: Recall: (0.726703076186149 / 1) 72.67% Precision: (0.79135580542527 / 1) 79.13%  F1: 75.43%
+METRIC muc:Coreference: Recall: (6253 / 10539) 59.33%	Precision: (6253 / 10073) 62.07%	F1: 60.67%
+METRIC bcub:Coreference: Recall: (12457.63 / 18383) 67.76%	Precision: (13632.3 / 18383) 74.15%	F1: 70.81%
+METRIC ceafm:Coreference: Recall: (10927 / 18383) 59.44%	Precision: (10927 / 18383) 59.44%	F1: 59.44%
+METRIC ceafe:Coreference: Recall: (3833.81 / 7844) 48.87%	Precision: (3833.81 / 8310) 46.13%	F1: 47.46%
+METRIC blanc:Coreference links: Recall: (25241 / 54427) 46.37%	Precision: (25241 / 40586) 62.19%	F1: 53.13%
+Non-coreference links: Recall: (931826 / 947171) 98.37%	Precision: (931826 / 961012) 96.96%	F1: 97.66%
+BLANC: Recall: (0.72 / 1) 72.37%	Precision: (0.8 / 1) 79.57%	F1: 75.39%
 
-Final conll score ((muc+bcub+ceafe)/3) = 59.7
-Final score (pairwise) Precision = 0.56
+Final conll score ((muc+bcub+ceafe)/3) = 59.65
+Final score (pairwise) Precision = 0.57
 done

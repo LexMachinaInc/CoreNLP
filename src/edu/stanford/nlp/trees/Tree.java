@@ -20,14 +20,7 @@ import edu.stanford.nlp.ling.Sentence;
 import edu.stanford.nlp.ling.TaggedWord;
 import edu.stanford.nlp.ling.Word;
 import edu.stanford.nlp.ling.CoreAnnotations;
-import edu.stanford.nlp.util.Filter;
-import edu.stanford.nlp.util.Filters;
-import edu.stanford.nlp.util.Generics;
-import edu.stanford.nlp.util.IntPair;
-import edu.stanford.nlp.util.MutableInteger;
-import edu.stanford.nlp.util.Pair;
-import edu.stanford.nlp.util.Scored;
-import edu.stanford.nlp.util.XMLUtils;
+import edu.stanford.nlp.util.*;
 
 /**
  * The abstract class <code>Tree</code> is used to collect all of the
@@ -429,8 +422,8 @@ public abstract class Tree extends AbstractCollection<Tree> implements Label, La
    * @return an IntPair: the SpanAnnotation of this node.
    */
   public IntPair getSpan() {
-    if(label() instanceof CoreLabel && ((CoreLabel) label()).has(CoreAnnotations.SpanAnnotation.class))
-      return ((CoreLabel) label()).get(CoreAnnotations.SpanAnnotation.class);
+    if(label() instanceof CoreMap && ((CoreMap) label()).has(CoreAnnotations.SpanAnnotation.class))
+      return ((CoreMap) label()).get(CoreAnnotations.SpanAnnotation.class);
     return null;
   }
 
@@ -489,7 +482,7 @@ public abstract class Tree extends AbstractCollection<Tree> implements Label, La
    * @return The index of the right frontier of the constituent
    */
   private int constituentsNodes(int left) {
-    if (isPreTerminal()) {
+    if (isLeaf()) {
       if (label() instanceof CoreLabel) {
         ((CoreLabel) label()).set(CoreAnnotations.SpanAnnotation.class, new IntPair(left, left));
       } else {
@@ -749,8 +742,8 @@ public abstract class Tree extends AbstractCollection<Tree> implements Label, La
     pw.println(sb.toString());
     Tree[] children = children();
     String newIndent = indent + pad;
-    for (int i = 0, n = children.length; i < n; i++) {
-      children[i].indentedListPrint(newIndent, pad, pw, printScores);
+    for (Tree child : children) {
+      child.indentedListPrint(newIndent, pad, pw, printScores);
     }
   }
 
@@ -795,7 +788,13 @@ public abstract class Tree extends AbstractCollection<Tree> implements Label, La
     Label label = label();
     if (label != null) {
       sb.append("<");
+      if (children.length > 0) {
+        sb.append("node value=\"");
+      } else {
+        sb.append("leaf value=\"");
+      }
       sb.append(XMLUtils.escapeXML(Sentence.wordToString(label, true)));
+      sb.append("\"");
       if (printScores) {
         sb.append(" score=");
         sb.append(score());
@@ -805,6 +804,12 @@ public abstract class Tree extends AbstractCollection<Tree> implements Label, La
       } else {
         sb.append("/>");
       }
+    } else {
+      if (children.length > 0) {
+        sb.append("<node>");
+      } else {
+        sb.append("<leaf/>");
+      }
     }
     pw.println(sb.toString());
     if (children.length > 0) {
@@ -812,13 +817,7 @@ public abstract class Tree extends AbstractCollection<Tree> implements Label, La
       for (Tree child : children) {
         child.indentedXMLPrint(newIndent, pad, pw, printScores);
       }
-      if (label != null) {
-        sb = new StringBuilder(indent);
-        sb.append("</");
-        sb.append(XMLUtils.escapeXML(Sentence.wordToString(label, true)));
-        sb.append(">");
-        pw.println(sb.toString());
-      }
+      pw.println(indent + "</node>");
     }
   }
 
@@ -848,8 +847,6 @@ public abstract class Tree extends AbstractCollection<Tree> implements Label, La
     return (value() == null) ? "" : value();
   }
 
-  public static boolean DISPLAY_SCORES = true;
-
   /**
    * Display a node, implementing Penn Treebank style layout
    */
@@ -875,7 +872,13 @@ public abstract class Tree extends AbstractCollection<Tree> implements Label, La
       return;
     }
     pw.print("(");
-    String nodeString = onlyLabelValue ? value() : nodeString();
+    String nodeString;
+    if (onlyLabelValue) {
+      String value = value();
+      nodeString = (value == null) ? "" : value;
+    } else {
+      nodeString = nodeString();
+    }
     pw.print(nodeString);
     // pw.flush();
     boolean parentIsNull = label() == null || label().value() == null;
@@ -1053,6 +1056,51 @@ public abstract class Tree extends AbstractCollection<Tree> implements Label, La
       }
       System.err.println("Head preterminal is null: " + this);
       return null;
+    }
+  }
+
+  /**
+   * Finds the head words of each tree and assigns HeadWordAnnotation
+   * to each node pointing to the correct node.  This relies on the
+   * nodes being CoreLabels, so it throws an IllegalArgumentException
+   * if this is ever not true.
+   */
+  public void percolateHeadAnnotations(HeadFinder hf) {
+    if (!(label() instanceof CoreLabel)) {
+      throw new IllegalArgumentException("Expected CoreLabels in the trees");
+    }
+    CoreLabel nodeLabel = (CoreLabel) label();
+
+    if (isLeaf()) {
+      return;
+    }
+
+    if (isPreTerminal()) {
+      nodeLabel.set(TreeCoreAnnotations.HeadWordAnnotation.class, children()[0]);
+      nodeLabel.set(TreeCoreAnnotations.HeadTagAnnotation.class, this);
+      return;
+    }
+
+    for (Tree kid : children()) {
+      kid.percolateHeadAnnotations(hf);
+    }
+
+    final Tree head = hf.determineHead(this);
+    if (head == null) {
+      throw new NullPointerException("HeadFinder " + hf + " returned null for " + this);
+    } else if (head.isLeaf()) {
+      nodeLabel.set(TreeCoreAnnotations.HeadWordAnnotation.class, head);
+      nodeLabel.set(TreeCoreAnnotations.HeadTagAnnotation.class, head.parent(this));
+    } else if (head.isPreTerminal()) {
+      nodeLabel.set(TreeCoreAnnotations.HeadWordAnnotation.class, head.children()[0]);
+      nodeLabel.set(TreeCoreAnnotations.HeadTagAnnotation.class, head);
+    } else {
+      if (!(head.label() instanceof CoreLabel)) {
+        throw new AssertionError("Horrible bug");
+      }
+      CoreLabel headLabel = (CoreLabel) head.label();
+      nodeLabel.set(TreeCoreAnnotations.HeadWordAnnotation.class, headLabel.get(TreeCoreAnnotations.HeadWordAnnotation.class));
+      nodeLabel.set(TreeCoreAnnotations.HeadTagAnnotation.class, headLabel.get(TreeCoreAnnotations.HeadTagAnnotation.class));
     }
   }
 
@@ -1235,7 +1283,7 @@ public abstract class Tree extends AbstractCollection<Tree> implements Label, La
    */
   public Set<Dependency<Label, Label, Object>> mapDependencies(Filter<Dependency<Label, Label, Object>> f, HeadFinder hf) {
     if (hf == null) {
-      throw new IllegalArgumentException("mapDependencies: need headfinder");
+      throw new IllegalArgumentException("mapDependencies: need HeadFinder");
     }
     Set<Dependency<Label, Label, Object>> deps = Generics.newHashSet();
     for (Tree node : this) {
@@ -1248,7 +1296,7 @@ public abstract class Tree extends AbstractCollection<Tree> implements Label, La
       Tree hwt = node.headTerminal(hf);
       // System.err.println("have hf, found head preterm: " + hwt);
       if (hwt == null) {
-        throw new IllegalStateException("mapDependencies: headFinder failed!");
+        throw new IllegalStateException("mapDependencies: HeadFinder failed!");
       }
 
       for (Tree child : node.children()) {
@@ -1256,7 +1304,7 @@ public abstract class Tree extends AbstractCollection<Tree> implements Label, La
         // Tree dwt = child.headPreTerminal(hf);
         Tree dwt = child.headTerminal(hf);
         if (dwt == null) {
-          throw new IllegalStateException("mapDependencies: headFinder failed!");
+          throw new IllegalStateException("mapDependencies: HeadFinder failed!");
         }
         //System.err.println("kid is " + dl);
          //System.err.println("transformed to " + dml.toString("value{map}"));
@@ -1581,12 +1629,13 @@ public abstract class Tree extends AbstractCollection<Tree> implements Label, La
 
 
   /**
-   * Get the set of all node and leaf <code>Label</code>s,
+   * Get the set of all node and leaf {@code Label}s,
    * null or otherwise, contained in the tree.
    *
-   * @return the <code>Collection</code> (actually, Set) of all values
+   * @return the {@code Collection} (actually, Set) of all values
    *         in the tree.
    */
+  @Override
   public Collection<Label> labels() {
     Set<Label> n = Generics.newHashSet();
     n.add(label());
@@ -1598,6 +1647,7 @@ public abstract class Tree extends AbstractCollection<Tree> implements Label, La
   }
 
 
+  @Override
   public void setLabels(Collection<Label> c) {
     throw new UnsupportedOperationException("Can't set Tree labels");
   }
@@ -1990,15 +2040,17 @@ public abstract class Tree extends AbstractCollection<Tree> implements Label, La
   }
 
   /**
-   * Returns first child if it is single and if the label at the current
+   * Returns first child if this is unary and if the label at the current
    * node is either "ROOT" or empty.
    *
+   * @return The first child if this is unary and if the label at the current
+   * node is either "ROOT" or empty, else this
    */
   public Tree skipRoot() {
     if(!isUnaryRewrite())
       return this;
     String lab = label().value();
-    return (lab == null || "ROOT".equals(lab) || "".equals(lab)) ? firstChild() : this;
+    return (lab == null || lab.isEmpty() || "ROOT".equals(lab)) ? firstChild() : this;
   }
 
   /**
@@ -2313,7 +2365,8 @@ public abstract class Tree extends AbstractCollection<Tree> implements Label, La
    * t.dominates(t) returns false.
    */
   public boolean dominates(Tree t) {
-    return !(dominationPath(t) == null);
+    List<Tree> dominationPath = dominationPath(t);
+    return dominationPath != null && dominationPath.size() > 1;
   }
 
   /**
@@ -2684,16 +2737,27 @@ public abstract class Tree extends AbstractCollection<Tree> implements Label, La
    * @param overWrite Whether to replace an existing index for a leaf.
    * @return the next index still unassigned
    */
-  private int indexLeaves(int startIndex, boolean overWrite) {
+  public int indexLeaves(int startIndex, boolean overWrite) {
     if (isLeaf()) {
-      CoreLabel afl = (CoreLabel) label();
+
+      /*CoreLabel afl = (CoreLabel) label();
       Integer oldIndex = afl.get(CoreAnnotations.IndexAnnotation.class);
       if (!overWrite && oldIndex != null && oldIndex >= 0) {
         startIndex = oldIndex;
       } else {
         afl.set(CoreAnnotations.IndexAnnotation.class, startIndex);
+      }*/
+
+      if(label() instanceof HasIndex) {
+        HasIndex hi = (HasIndex) label();
+        int oldIndex = hi.index();
+        if (!overWrite && oldIndex >= 0) {
+          startIndex = oldIndex;
+        } else {
+          hi.setIndex(startIndex);
+        }
+        startIndex++;
       }
-      startIndex++;
     } else {
       for (Tree kid : children()) {
         startIndex = kid.indexLeaves(startIndex, overWrite);
@@ -2767,9 +2831,12 @@ public abstract class Tree extends AbstractCollection<Tree> implements Label, La
       }
     }
 
-    CoreLabel afl = (CoreLabel) label();
-    afl.set(CoreAnnotations.BeginIndexAnnotation.class, start);
-    afl.set(CoreAnnotations.EndIndexAnnotation.class, end);
+    Label label = label();
+    if (label instanceof CoreMap) {
+    CoreMap afl = (CoreMap) label();
+      afl.set(CoreAnnotations.BeginIndexAnnotation.class, start);
+      afl.set(CoreAnnotations.EndIndexAnnotation.class, end);
+    }
     return new Pair<Integer, Integer>(start, end);
   }
 

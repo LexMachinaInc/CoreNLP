@@ -1,4 +1,4 @@
-Stanford Lexicalized Parser v3.2.0 - 2013-06-19
+Stanford Lexicalized Parser v3.3.1 - 2014-01-04
 -----------------------------------------------
 
 Copyright (c) 2002-2012 The Board of Trustees of The Leland Stanford Junior
@@ -110,18 +110,15 @@ paths), but you should be able to see what we did.
 Arabic
 Trained on parts 1-3 of the Penn Arabic Treebank (ATB) using the
 pre-processing described in (Green and Manning, 2010). The default input
-encoding is UTF-8 Arabic script.  To parse with Buckwalter encoding, we
-recommend conversion to UTF-8 using the package
+encoding is UTF-8 Arabic script. You can convert text in Buckwalter encoding to UTF-8
+with the package edu.stanford.nlp.international.arabic.Buckwalter which is included 
+in stanford-parser.jar.
 
-    edu.stanford.nlp.international.arabic.Buckwalter
+The parser *requires* segmentation and tokenization of raw text per the ATB standard
+prior to parsing. You can generate this segmentation and tokenization with the Stanford 
+Word Segmenter, which is available separately at:
 
-which is included in stanford-parser.jar.
-
-Note that the parser *requires* clitic segmentation per the ATB standard
-prior to parsing. A freely available package for performing this segmentation
-is MADA+TOKAN:
-
-    http://www1.cs.columbia.edu/~rambow/software-downloads/MADA_Distribution.html
+  http://nlp.stanford.edu/software/segmenter.shtml
 
 Chinese
 There are Chinese grammars trained just on mainland material from
@@ -130,11 +127,10 @@ input encoding is GB18030.
 
 French
 Trained on the functionally annotated section of the French Treebank
-(FTB) using the pre-processing described in (Green et al., 2011). Tokenization
-according to the FTB standard is required prior to parsing. A freely available
-set of tokenization tools can be found at:
-
-    http://gforge.inria.fr/projects/lingwb/
+(FTB) using the pre-processing described in (Green et al., 2011). For raw text input,
+a tokenizer is enabled by default that produces FTB tokenization. To disable this
+tokenizer, use the "-tokenized" option. To tokenize raw text separately, see
+the usage information in edu.stanford.nlp.international.french.process.FrenchTokenizer.
 
 German
 Trained on the Negra corpus. Details are included in (Rafferty and
@@ -209,6 +205,11 @@ LICENSE
 ---------------------------------
 CHANGES
 ---------------------------------
+
+2014-01-04    3.3.1     Bugfix release, dependency improvements 
+
+2013-11-12    3.3.0     Remove the attr dependency, add imperatives to 
+                        English training data 
 
 2013-06-19    3.2.0     New RNN model for WSJ and English with 
                         improved test set accuracy, rel dependency 

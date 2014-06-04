@@ -70,7 +70,11 @@ public class TimeExpression extends MatchedExpression {
     public TimeExpression apply(MatchedExpression in) {
       if (in == null) return null;
       if (in instanceof TimeExpression) return (TimeExpression) in;
-      return new TimeExpression(in);
+      TimeExpression newExpr = new TimeExpression(in);
+      if (newExpr.getAnnotation().get(TimeExpression.Annotation.class) == in) {
+        newExpr.getAnnotation().set(TimeExpression.Annotation.class, newExpr);
+      }
+      return newExpr;
     }
   };
 
@@ -96,7 +100,7 @@ public class TimeExpression extends MatchedExpression {
     SUTime.Temporal t = getTemporal();
     if (t != null) {
       if (t != SUTime.TIME_NONE_OK) {
-        setTemporal(EnglishTimeExpressionPatterns.addMod(text, t));
+        setTemporal(t);
         return true;
       } else {
         return false;

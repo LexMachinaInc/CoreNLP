@@ -448,7 +448,7 @@ public class QNMinimizer implements Minimizer<DiffFunction>, HasEvaluators {
       int size = values.size();
       double newestVal = values.get(size - 1);
       double previousVal = (size >= 10 ? values.get(size - 10) : values.get(0));
-      double averageImprovement = (previousVal - newestVal) / size;
+      double averageImprovement = (previousVal - newestVal) / (size >= 10 ? 10 : size);
       int evalsSize = evals.size();
 
       if (useMaxItr && its >= maxItr)
@@ -983,11 +983,7 @@ public class QNMinimizer implements Minimizer<DiffFunction>, HasEvaluators {
     do {
       try {
         sayln();
-        boolean doEval = (its > 0 && its >= startEvaluateIters && evaluateIters > 0 && its % evaluateIters == 0);
-        double evalScore = Double.NEGATIVE_INFINITY;
-        if (doEval) {
-          evalScore = doEvaluation(x);
-        }
+        boolean doEval = (its >= 0 && its >= startEvaluateIters && evaluateIters > 0 && its % evaluateIters == 0);
         its += 1;
         double newValue;
         double[] newPoint = new double[3]; // initialized in loop
@@ -1055,6 +1051,11 @@ public class QNMinimizer implements Minimizer<DiffFunction>, HasEvaluators {
         if (useOWLQN) {
           // pseudo gradient
           newGrad = pseudoGradientOWL(newX, newGrad, dfunction);
+        }
+
+        double evalScore = Double.NEGATIVE_INFINITY;
+        if (doEval) {
+          evalScore = doEvaluation(newX);
         }
 
         // Add the current value and gradient to the records, this also monitors

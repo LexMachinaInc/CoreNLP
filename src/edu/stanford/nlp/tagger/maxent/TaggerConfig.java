@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import edu.stanford.nlp.io.IOUtils;
+import edu.stanford.nlp.io.RuntimeIOException;
 import edu.stanford.nlp.util.Generics;
 
 /**
@@ -52,13 +53,9 @@ public class TaggerConfig extends Properties /* Inherits implementation of Seria
   VERBOSE = "false",
   VERBOSE_RESULTS = "true",
   SGML = "false",
-  INIT_FROM_TREES = "false",
   LANG = "",
   TOKENIZER_FACTORY = "",
   XML_INPUT = "",
-  TREE_TRANSFORMER = "",
-  TREE_NORMALIZER = "",
-  TREE_RANGE = "",
   TAG_INSIDE = "",
   APPROXIMATE = "-1.0",
   TOKENIZER_OPTIONS = "",
@@ -95,7 +92,6 @@ public class TaggerConfig extends Properties /* Inherits implementation of Seria
     defaultValues.put("learnClosedClassTags", LEARN_CLOSED_CLASS);
     defaultValues.put("verbose", VERBOSE);
     defaultValues.put("verboseResults", VERBOSE_RESULTS);
-    defaultValues.put("sgml", SGML);
     defaultValues.put("openClassTags", "");
     defaultValues.put("lang", LANG);
     defaultValues.put("tokenizerFactory", TOKENIZER_FACTORY);
@@ -140,18 +136,19 @@ public class TaggerConfig extends Properties /* Inherits implementation of Seria
     // Properties modelProps = new Properties();
     // TaggerConfig oldConfig = new TaggerConfig(); // loads default values in oldConfig
     if (! props.containsKey("trainFile")) {
-      try {
-        String name = props.getProperty("model");
-        if (name == null) {
-          name = props.getProperty("dump");
+      String name = props.getProperty("model");
+      if (name == null) {
+        name = props.getProperty("dump");
+      }
+      if (name != null) {
+        try {
+          System.err.println("Loading default properties from tagger " + name);
+          DataInputStream in = new DataInputStream(IOUtils.getInputStreamFromURLOrClasspathOrFileSystem(name));
+          this.putAll(TaggerConfig.readConfig(in)); // overwrites defaults with any serialized values.
+          in.close();
+        } catch (Exception e) {
+          throw new RuntimeIOException("No such trained tagger config file found: " + name);
         }
-        System.err.println("Loading default properties from tagger " + name);
-        DataInputStream in = new DataInputStream(IOUtils.getInputStreamFromURLOrClasspathOrFileSystem(name));
-        this.putAll(TaggerConfig.readConfig(in)); // overwrites defaults with any serialized values.
-        in.close();
-      } catch (Exception e) {
-        System.err.println("Error: No such trained tagger config file found.");
-        e.printStackTrace();
       }
     }
 
@@ -272,8 +269,6 @@ public class TaggerConfig extends Properties /* Inherits implementation of Seria
 
   public String getModel() { return getProperty("model"); }
 
-  public String getJarModel() { return getProperty("jarModel"); }
-
   public String getFile() { return getProperty("file"); }
 
   public String getOutputFile() { return getProperty("outputFile"); }
@@ -288,6 +283,10 @@ public class TaggerConfig extends Properties /* Inherits implementation of Seria
 
   public boolean getOutputLemmas() {
     return getOutputOptionsContains("lemmatize");
+  }
+
+  public boolean keepEmptySentences() {
+    return getOutputOptionsContains("keepEmptySentences");    
   }
 
   public boolean getOutputOptionsContains(String sought) {
@@ -549,8 +548,8 @@ public class TaggerConfig extends Properties /* Inherits implementation of Seria
     out.println("# outputFormat = " + OUTPUT_FORMAT);
     out.println();
 
-    out.println("# Output format options. Comma separated list, but");
-    out.println("# currently \"lemmatize\" is the only supported option.");
+    out.println("# Output format options. Comma separated list.");
+    out.println("# currently \"lemmatize\" and \"keepEmptySentences\" are supported.");
     out.println("# outputFormatOptions = " + OUTPUT_FORMAT_OPTIONS);
     out.println();
 

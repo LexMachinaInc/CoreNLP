@@ -53,7 +53,23 @@ public class Span implements Serializable, Iterable<Integer> {
       return new Span(val2, val1);
     }
   }
-  
+
+  public static Span fromValues(Object... values) {
+    if (values.length == 1) {
+      return fromValues(values[0], values[0] instanceof Number ? ((Number) values[0]).intValue() + 1 : Integer.parseInt(values[0].toString()) + 1);
+    }
+    if (values.length != 2) { throw new IllegalArgumentException("fromValues() must take an array with 2 elements"); }
+    int val1;
+    if (values[0] instanceof Number) { val1 = ((Number) values[0]).intValue(); }
+    else if (values[0] instanceof String) { val1 = Integer.parseInt((String) values[0]); }
+    else { throw new IllegalArgumentException("Unknown value for span: " + values[0]); }
+    int val2;
+    if (values[1] instanceof Number) { val2 = ((Number) values[1]).intValue(); }
+    else if (values[0] instanceof String) { val2 = Integer.parseInt((String) values[1]); }
+    else { throw new IllegalArgumentException("Unknown value for span: " + values[1]); }
+    return fromValues(val1, val2);
+  }
+
   public int start() { return start; }
   public int end() { return end; }
   
@@ -154,6 +170,19 @@ public class Span implements Serializable, Iterable<Integer> {
             (spanA.end > spanB.end && spanA.start < spanB.end) ||
             (spanB.end > spanA.end && spanB.start < spanA.end) ||
             spanA.equals(spanB);
+  }
+
+  public static int overlap(Span spanA, Span spanB) {
+    if (spanA.contains(spanB)) {
+      return Math.min(spanA.end - spanA.start, spanB.end - spanB.start);
+    } else if (spanA.equals(spanB)) {
+      return spanA.end - spanA.start;
+    } else if ( (spanA.end > spanB.end && spanA.start < spanB.end) ||
+                (spanB.end > spanA.end && spanB.start < spanA.end) ) {
+      return Math.min(spanA.end, spanB.end) - Math.max(spanA.start, spanB.start) ;
+    } else {
+      return 0;
+    }
   }
 
   public static boolean overlaps(Span spanA, Collection<Span> spanB) {

@@ -561,6 +561,78 @@ public class TokenSequenceMatcherITest extends TestCase {
     assertFalse(match);
   }
 
+  public void testTokenSequenceMatcherAll2() throws IOException {
+    String text = "DATE1 PROD1 PRICE1 PROD2 PRICE2 PROD3 PRICE3 DATE2 PROD4 PRICE4 PROD5 PRICE5 PROD6 PRICE6";
+    CoreMap doc = createDocument(text);
+    TokenSequencePattern p = TokenSequencePattern.compile(
+        "(/DATE.*/) (?: /PROD.*/ /PRICE.*/)* (/PROD.*/) (/PRICE.*/)");
+
+    TokenSequenceMatcher m = p.getMatcher(doc.get(CoreAnnotations.TokensAnnotation.class));
+    m.setFindType(SequenceMatcher.FindType.FIND_ALL);
+    // Test finding of ALL matching sequences
+    boolean match = m.find();
+    assertTrue(match);
+    assertEquals(3, m.groupCount());
+    assertEquals("DATE1", m.group(1));
+    assertEquals("PROD3", m.group(2));
+    assertEquals("PRICE3", m.group(3));
+    match = m.find();
+    assertTrue(match);
+    assertEquals(3, m.groupCount());
+    assertEquals("DATE1", m.group(1));
+    assertEquals("PROD2", m.group(2));
+    assertEquals("PRICE2", m.group(3));
+    match = m.find();
+    assertTrue(match);
+    assertEquals(3, m.groupCount());
+    assertEquals("DATE1", m.group(1));
+    assertEquals("PROD1", m.group(2));
+    assertEquals("PRICE1", m.group(3));
+    match = m.find();
+    assertTrue(match);
+    assertEquals(3, m.groupCount());
+    assertEquals("DATE2", m.group(1));
+    assertEquals("PROD6", m.group(2));
+    assertEquals("PRICE6", m.group(3));
+    match = m.find();
+    assertTrue(match);
+    assertEquals(3, m.groupCount());
+    assertEquals("DATE2", m.group(1));
+    assertEquals("PROD5", m.group(2));
+    assertEquals("PRICE5", m.group(3));
+    match = m.find();
+    assertTrue(match);
+    assertEquals(3, m.groupCount());
+    assertEquals("DATE2", m.group(1));
+    assertEquals("PROD4", m.group(2));
+    assertEquals("PRICE4", m.group(3));
+    match = m.find();
+    assertFalse(match);
+  }
+
+  public void testTokenSequenceMatcherNonOverlapping() throws IOException {
+    String text = "DATE1 PROD1 PRICE1 PROD2 PRICE2 PROD3 PRICE3 DATE2 PROD4 PRICE4 PROD5 PRICE5 PROD6 PRICE6";
+    CoreMap doc = createDocument(text);
+    TokenSequencePattern p = TokenSequencePattern.compile(
+        "(/DATE.*/) ((/PROD.*/ /PRICE.*/)+)");
+
+    TokenSequenceMatcher m = p.getMatcher(doc.get(CoreAnnotations.TokensAnnotation.class));
+    boolean match = m.find();
+    assertTrue(match);
+    assertEquals(3, m.groupCount());
+    assertEquals("DATE1", m.group(1));
+    assertEquals("PROD1 PRICE1 PROD2 PRICE2 PROD3 PRICE3", m.group(2));
+    assertEquals("PROD3 PRICE3", m.group(3));
+    match = m.find();
+    assertTrue(match);
+    assertEquals(3, m.groupCount());
+    assertEquals("DATE2", m.group(1));
+    assertEquals("PROD4 PRICE4 PROD5 PRICE5 PROD6 PRICE6", m.group(2));
+    assertEquals("PROD6 PRICE6", m.group(3));
+    match = m.find();
+    assertFalse(match);
+  }
+
   public void testTokenSequenceMatcher4() throws IOException {
     CoreMap doc = createDocument(testText1);
 
@@ -988,6 +1060,33 @@ public class TokenSequenceMatcherITest extends TestCase {
     assertEquals("Mellitus", m.group(1));
     assertEquals("Bishop", m.group(2));
     assertEquals("London", m.group(3));
+
+
+    // Same as above but without extra "{}"
+    nnpPattern = TokenSequencePattern.compile( " ( [ tag:\"NNP\" ] )" );
+    env.bind("$NNP", nnpPattern);
+    p = TokenSequencePattern.compile(env, " $NNP /is|was/ []*? $NNP+ \"of\" $NNP+ ");
+    m = p.getMatcher(doc.get(CoreAnnotations.TokensAnnotation.class));
+    match = m.find();
+    assertTrue(match);
+    assertEquals(3, m.groupCount());
+    assertEquals("Mellitus was the first Bishop of London", m.group());
+    assertEquals("Mellitus", m.group(1));
+    assertEquals("Bishop", m.group(2));
+    assertEquals("London", m.group(3));
+
+    // Same as above but using "pos"
+    nnpPattern = TokenSequencePattern.compile( " ( [ pos:\"NNP\" ] )" );
+    env.bind("$NNP", nnpPattern);
+    p = TokenSequencePattern.compile(env, " $NNP /is|was/ []*? $NNP+ \"of\" $NNP+ ");
+    m = p.getMatcher(doc.get(CoreAnnotations.TokensAnnotation.class));
+    match = m.find();
+    assertTrue(match);
+    assertEquals(3, m.groupCount());
+    assertEquals("Mellitus was the first Bishop of London", m.group());
+    assertEquals("Mellitus", m.group(1));
+    assertEquals("Bishop", m.group(2));
+    assertEquals("London", m.group(3));
   }
 
   public void testTokenSequenceMatcherNumber() throws IOException {
@@ -1007,12 +1106,33 @@ public class TokenSequenceMatcherITest extends TestCase {
     match = m.find();
     assertFalse(match);
 
-    p = TokenSequencePattern.compile( "[ { word>=2000 } ]+");
+    p = TokenSequencePattern.compile( "[ { word>=2002 } ]+");
     m = p.getMatcher(doc.get(CoreAnnotations.TokensAnnotation.class));
     match = m.find();
     assertTrue(match);
     assertEquals(0, m.groupCount());
     assertEquals("2002", m.group());
+    match = m.find();
+    assertFalse(match);
+
+    p = TokenSequencePattern.compile( "[ { word>2002 } ]+");
+    m = p.getMatcher(doc.get(CoreAnnotations.TokensAnnotation.class));
+    match = m.find();
+    assertFalse(match);
+
+    // Check no {} with or
+    p = TokenSequencePattern.compile( "[ word > 2002 | word==2002 ]+");
+    m = p.getMatcher(doc.get(CoreAnnotations.TokensAnnotation.class));
+    match = m.find();
+    assertTrue(match);
+    assertEquals(0, m.groupCount());
+    assertEquals("2002", m.group());
+    match = m.find();
+    assertFalse(match);
+
+    // Check no {} with and
+    p = TokenSequencePattern.compile( "[ word>2002 & word==2002 ]+");
+    m = p.getMatcher(doc.get(CoreAnnotations.TokensAnnotation.class));
     match = m.find();
     assertFalse(match);
 
@@ -1025,16 +1145,20 @@ public class TokenSequenceMatcherITest extends TestCase {
     match = m.find();
     assertFalse(match);
 
-    p = TokenSequencePattern.compile( "[ { word<=2000 } ]+");
+    p = TokenSequencePattern.compile( "[ { word<=2002 } ]+");
     m = p.getMatcher(doc.get(CoreAnnotations.TokensAnnotation.class));
     match = m.find();
     assertTrue(match);
     assertEquals(0, m.groupCount());
     assertEquals("3", m.group());
     match = m.find();
+    assertTrue(match);
+    assertEquals(0, m.groupCount());
+    assertEquals("2002", m.group());
+    match = m.find();
     assertFalse(match);
 
-    p = TokenSequencePattern.compile( "[ { word<2000 } ]+");
+    p = TokenSequencePattern.compile( "[ { word<2002 } ]+");
     m = p.getMatcher(doc.get(CoreAnnotations.TokensAnnotation.class));
     match = m.find();
     assertTrue(match);
@@ -1085,6 +1209,21 @@ public class TokenSequenceMatcherITest extends TestCase {
     assertTrue(match);
     assertEquals(0, m.groupCount());
     assertEquals("2002", m.group());
+    match = m.find();
+    assertFalse(match);
+  }
+
+  public void testTokenSequenceMatcherNested() throws IOException {
+    CoreMap doc = createDocument("A A A B B B B B B C C");
+
+    // Test sequence with groups
+    TokenSequencePattern p = TokenSequencePattern.compile( "( /B/+ )+");
+    TokenSequenceMatcher m = p.getMatcher(doc.get(CoreAnnotations.TokensAnnotation.class));
+    boolean match = m.find();
+    assertTrue(match);
+    assertEquals(1, m.groupCount());
+    assertEquals("B B B B B B", m.group());
+    assertEquals("B B B B B B", m.group(1));
     match = m.find();
     assertFalse(match);
   }
@@ -1298,7 +1437,7 @@ public class TokenSequenceMatcherITest extends TestCase {
   public void testCompile() {
     String s = "(?$se \"matching\" \"this\"|\"don't\")";
     CoreMap doc = createDocument("does this do matching this");
-    TokenSequencePattern p =TokenSequencePattern.compile(s);
+    TokenSequencePattern p = TokenSequencePattern.compile(s);
     TokenSequenceMatcher m = p.getMatcher(doc.get(CoreAnnotations.TokensAnnotation.class));
     boolean match = m.find();
     assertTrue(match);

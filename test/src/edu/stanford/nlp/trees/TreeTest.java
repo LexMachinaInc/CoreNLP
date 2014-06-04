@@ -77,4 +77,29 @@ public class TreeTest extends TestCase {
     assertEquals("ROOT", t.toString());
   }
 
+
+  public void testDominates() {
+    Tree t = Tree.valueOf("(A (B this) (C (D is) (E a) (F small)) (G test))");
+    assertFalse(t.dominates(t));
+
+    for (Tree child : t.children()) {
+      assertTrue(t.dominates(child));
+      assertFalse(child.dominates(t));
+    }
+  }
+
+  public void testPennPrint() {
+    // a Label with a null value should print as "" not null.
+    Tree t = Tree.valueOf("( (SBARQ (WHNP (WP What)) (SQ (VBP are) (NP (DT the) (NNP Valdez) (NNS Principles))) (. ?)))",
+            new LabeledScoredTreeReaderFactory(new TreeNormalizer()));
+    assertNull("Root of tree should have null label if none in String", t.label().value());
+
+    String separator = System.getProperty("line.separator");
+    String answer = ("( (SBARQ" + separator +
+                     "    (WHNP (WP What))" + separator +
+                     "    (SQ (VBP are)" + separator +
+                     "      (NP (DT the) (NNP Valdez) (NNS Principles)))" + separator +
+                     "    (. ?)))" + separator);
+    assertEquals(answer, t.pennString());
+  }
 }

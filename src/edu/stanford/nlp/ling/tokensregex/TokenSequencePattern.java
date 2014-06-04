@@ -6,7 +6,7 @@ import edu.stanford.nlp.util.*;
 import java.util.*;
 
 /**
- * Token Sequence Pattern for regular expressions for sequences over tokens (as the more general <code>CoreMap</code>).
+ * Token Sequence Pattern for regular expressions over sequences of tokens (each represented as a <code>CoreMap</code>).
  * Sequences over tokens can be matched like strings.
  * <p>
  * To use
@@ -56,6 +56,7 @@ import java.util.*;
  * <li> All specified token attributes match:
  * <br/> For Strings:
  *     <code> { lemma:/.../; tag:"NNP" } </code> = attributes that need to all match
+ *     If only one attribute, the {} can be dropped.
  * <br/> See {@link edu.stanford.nlp.ling.AnnotationLookup AnnotationLookup} for a list of predefined token attribute names.
  * <br/> Additional attributes can be bound using the environment (see below).
  * <br/> NOTE: <code>/.../</code> used for regular expressions,
@@ -89,6 +90,11 @@ import java.util.*;
  * <p>
  * String pattern match across multiple tokens:
  *   <code>(?m){min,max} /pattern/</code>
+ * </p>
+ *
+ * <p>
+ * Special expressions: indicated by double braces: <code>{{ expr }}</code>
+ *   <br/> See {@link edu.stanford.nlp.ling.tokensregex.types.Expressions} for syntax.
  * </p>
  *
  * <p>
@@ -152,7 +158,7 @@ public class TokenSequencePattern extends SequencePattern<CoreMap> {
   }
 
   /**
-   * Compiles a regular expression over tokens into a TokenSequencePattern
+   * Compiles a regular expressions over tokens into a TokenSequencePattern
    * using the default environment.
    *
    * @param string Regular expression to be compiled
@@ -181,12 +187,12 @@ public class TokenSequencePattern extends SequencePattern<CoreMap> {
       return new TokenSequencePattern(string, p.first(), p.second());
 
     } catch (Exception ex) {
-      throw new RuntimeException(ex);
+      throw new RuntimeException("When parsing " + string + "\t\t" + ex);
     }
   }
 
   /**
-   * Compiles a sequence of regular expression a TokenSequencePattern
+   * Compiles a sequence of regular expressions into a TokenSequencePattern
    * using the default environment.
    *
    * @param strings List of regular expression to be compiled
@@ -198,7 +204,7 @@ public class TokenSequencePattern extends SequencePattern<CoreMap> {
   }
 
   /**
-   * Compiles a sequence of regular expression a TokenSequencePattern
+   * Compiles a sequence of regular expressions into a TokenSequencePattern
    * using the specified environment.
    *
    * @param env Environment to use
@@ -221,6 +227,12 @@ public class TokenSequencePattern extends SequencePattern<CoreMap> {
     }
   }
 
+  /**
+   * Compiles a PatternExpr into a TokenSequencePattern.
+   *
+   * @param nodeSequencePattern A sequence pattern expression (before translation into a NFA)
+   * @return Compiled TokenSequencePattern
+   */
   public static TokenSequencePattern compile(SequencePattern.PatternExpr nodeSequencePattern)
   {
     return new TokenSequencePattern(null, nodeSequencePattern);
@@ -233,17 +245,33 @@ public class TokenSequencePattern extends SequencePattern<CoreMap> {
    * @param tokens List of tokens to match against
    * @return TokenSequenceMatcher
    */
+  @Override
   public TokenSequenceMatcher getMatcher(List<? extends CoreMap> tokens) {
     return new TokenSequenceMatcher(this, tokens);
   }
 
+  /**
+   * Returns a TokenSequenceMatcher that can be used to match this pattern
+   * against the specified list of tokens.
+   *
+   * @param tokens List of tokens to match against
+   * @return TokenSequenceMatcher
+   */
+  public TokenSequenceMatcher matcher(List<? extends CoreMap> tokens) {
+    return getMatcher(tokens);
+  }
+
+  /** Returns a String representation of the TokenSequencePattern.
+   *
+   * @return A String representation of the TokenSequencePattern
+   */
   @Override
   public String toString(){
     return this.pattern();
   }
 
   /**
-   * Create a multi pattern matcher for matching across multiple TokensRegex patterns
+   * Create a multi-pattern matcher for matching across multiple TokensRegex patterns
    * @param patterns Collection of input patterns
    * @return a MultiPatternMatcher
    */
@@ -255,7 +283,7 @@ public class TokenSequencePattern extends SequencePattern<CoreMap> {
   }
 
   /**
-   * Create a multi pattern matcher for matching across multiple TokensRegex patterns
+   * Create a multi-pattern matcher for matching across multiple TokensRegex patterns
    * @param patterns input patterns
    * @return a MultiPatternMatcher
    */

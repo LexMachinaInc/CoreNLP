@@ -29,9 +29,9 @@ package edu.stanford.nlp.parser.ui;
 import edu.stanford.nlp.io.ui.OpenPageDialog;
 import edu.stanford.nlp.ling.*;
 import edu.stanford.nlp.process.TokenizerFactory;
+import edu.stanford.nlp.parser.common.ParserQuery;
 import edu.stanford.nlp.parser.lexparser.ChineseLexiconAndWordSegmenter;
 import edu.stanford.nlp.parser.lexparser.LexicalizedParser;
-import edu.stanford.nlp.parser.lexparser.ParserQuery;
 import edu.stanford.nlp.process.*;
 import edu.stanford.nlp.swing.FontDetector;
 import edu.stanford.nlp.trees.PennTreebankLanguagePack;
@@ -85,7 +85,6 @@ public class ParserPanel extends JPanel {
 
   private static TreebankLanguagePack tlp;
   private String encoding = "UTF-8";
-  private boolean segmentWords = false;
 
   // one second in milliseconds
   private static final int ONE_SECOND = 1000;
@@ -137,7 +136,9 @@ public class ParserPanel extends JPanel {
 
     jfcLocation = new JFileChooserLocation(jfc);
 
-    setLanguage(UNTOKENIZED_ENGLISH);
+    tlp = new PennTreebankLanguagePack();
+    encoding = tlp.getEncoding();
+    setFont();
 
     // create a timer
     timer = new javax.swing.Timer(ONE_SECOND, new TimerListener());
@@ -288,33 +289,12 @@ public class ParserPanel extends JPanel {
     statusLabel.setText(status);
   }
 
-  /**
-   * Sets the language used by the ParserPanel to tokenize, parse, and
-   * display sentences.
-   *
-   * @param language One of several predefined language codes. e.g.
-   *                 <tt>UNTOKENIZED_ENGLISH</tt>, <tt>TOKENIZED_CHINESE</tt>, etc.
-   */
-  public void setLanguage(int language) {
-    switch (language) {
-      case UNTOKENIZED_ENGLISH:
-        tlp = new PennTreebankLanguagePack();
-        encoding = tlp.getEncoding();
-        textPane.setFont(new Font("Sans Serif", Font.PLAIN, 14));
-        treePanel.setFont(new Font("Sans Serif", Font.PLAIN, 14));
-        break;
-      case UNTOKENIZED_CHINESE:
-        segmentWords = true;
-        tlp = new ChineseTreebankLanguagePack();
-        encoding = "UTF-8"; // we support that not GB18030 currently....
-        setChineseFont();
-        break;
-      case TOKENIZED_CHINESE:
-        segmentWords = false;
-        tlp = new ChineseTreebankLanguagePack();
-        encoding = "UTF-8"; // we support that not GB18030 currently....
-        setChineseFont();
-        break;
+  private void setFont() {
+    if (tlp instanceof ChineseTreebankLanguagePack) {
+      setChineseFont();
+    } else {
+      textPane.setFont(new Font("Sans Serif", Font.PLAIN, 14));
+      treePanel.setFont(new Font("Sans Serif", Font.PLAIN, 14));      
     }
   }
 
@@ -328,6 +308,9 @@ public class ParserPanel extends JPanel {
     } else if (FontDetector.hasFont("Watanabe Mincho")) {
       textPane.setFont(new Font("Watanabe Mincho", Font.PLAIN, 14));
       treePanel.setFont(new Font("Watanabe Mincho", Font.PLAIN, 14));
+    } else {
+      textPane.setFont(new Font("Sans Serif", Font.PLAIN, 14));
+      treePanel.setFont(new Font("Sans Serif", Font.PLAIN, 14));      
     }
   }
 
